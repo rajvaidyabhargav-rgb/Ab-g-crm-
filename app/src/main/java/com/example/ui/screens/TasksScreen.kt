@@ -32,6 +32,9 @@ fun TasksScreen(
 
     var selectedStatusFilter by remember { mutableStateOf("Pending") }
 
+    var showEditTaskDialog by remember { mutableStateOf(false) }
+    var taskToEdit by remember { mutableStateOf<Task?>(null) }
+
     val filteredTasks = tasksList.filter { task ->
         selectedStatusFilter == "All" ||
         (selectedStatusFilter == "Pending" && task.status.lowercase() == "pending") ||
@@ -144,6 +147,12 @@ fun TasksScreen(
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(onClick = {
+                                    taskToEdit = task
+                                    showEditTaskDialog = true
+                                }) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                                }
                                 IconButton(onClick = { viewModel.deleteTask(task) }) {
                                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                                 }
@@ -152,6 +161,22 @@ fun TasksScreen(
                     }
                 }
             }
+        }
+    }
+
+    if (showEditTaskDialog) {
+        taskToEdit?.let { task ->
+            EditTaskDialog(
+                task = task,
+                clientsList = clientsList,
+                onDismiss = { showEditTaskDialog = false; taskToEdit = null },
+                onSave = { updatedTask ->
+                    viewModel.saveTask(updatedTask)
+                    showEditTaskDialog = false
+                    taskToEdit = null
+                    Toast.makeText(context, "Task Updated", Toast.LENGTH_SHORT).show()
+                }
+            )
         }
     }
 }

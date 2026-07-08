@@ -32,6 +32,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.LazyRow
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 
 @Composable
 fun ClientProfileScreen(
@@ -56,6 +59,10 @@ fun ClientProfileScreen(
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var showGenerateBillDialog by remember { mutableStateOf(false) }
     var customWorkUpdateText by remember { mutableStateOf("") }
+    var showEditClientDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showEditTaskDialog by remember { mutableStateOf(false) }
+    var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
     val client = clientState ?: return // Show loading or return
 
@@ -123,6 +130,133 @@ fun ClientProfileScreen(
                 }
             }
 
+            // --- Client Control Center ---
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Client Control Center",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    
+                    // Row 1: WhatsApp Communications
+                    Text(
+                        text = "WhatsApp Quick Messages",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val templates = viewModel.generateWhatsAppTemplates(client, null, customWorkUpdateText)
+                        
+                        AssistChip(
+                            onClick = {
+                                viewModel.sendWhatsAppMessage(client.whatsapp.ifBlank { client.phone }, templates[0].body)
+                                Toast.makeText(context, "Opening WhatsApp Message", Toast.LENGTH_SHORT).show()
+                            },
+                            label = { Text("WhatsApp Message", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF00E676)) }
+                        )
+                        
+                        AssistChip(
+                            onClick = {
+                                viewModel.sendWhatsAppMessage(client.whatsapp.ifBlank { client.phone }, templates[1].body)
+                                Toast.makeText(context, "Opening WhatsApp Bill Reminder", Toast.LENGTH_SHORT).show()
+                            },
+                            label = { Text("WhatsApp Bill Reminder", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF00E676)) }
+                        )
+                        
+                        AssistChip(
+                            onClick = {
+                                viewModel.sendWhatsAppMessage(client.whatsapp.ifBlank { client.phone }, templates[2].body)
+                                Toast.makeText(context, "Opening WhatsApp Payment Reminder", Toast.LENGTH_SHORT).show()
+                            },
+                            label = { Text("WhatsApp Payment Reminder", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF00E676)) }
+                        )
+                        
+                        AssistChip(
+                            onClick = {
+                                viewModel.sendWhatsAppMessage(client.whatsapp.ifBlank { client.phone }, templates[3].body)
+                                Toast.makeText(context, "Opening WhatsApp Work Update", Toast.LENGTH_SHORT).show()
+                            },
+                            label = { Text("WhatsApp Work Update", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Update, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF00E676)) }
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Row 2: Portfolio Operations
+                    Text(
+                        text = "Portfolio Management Actions",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AssistChip(
+                            onClick = {
+                                viewModel.pushTelegramClientProfile(client.id)
+                                Toast.makeText(context, "Telegram Profile Pushed", Toast.LENGTH_SHORT).show()
+                            },
+                            label = { Text("Telegram Push Message", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF00B0FF)) }
+                        )
+                        
+                        AssistChip(
+                            onClick = { showAddTaskDialog = true },
+                            label = { Text("Add Task", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.AddTask, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
+                        )
+                        
+                        AssistChip(
+                            onClick = { showEditClientDialog = true },
+                            label = { Text("Edit Client", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary) }
+                        )
+                        
+                        AssistChip(
+                            onClick = { showDeleteConfirmation = true },
+                            label = { Text("Delete Client", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error) }
+                        )
+                        
+                        AssistChip(
+                            onClick = { showGenerateBillDialog = true },
+                            label = { Text("Generate Bill", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.tertiary) }
+                        )
+                        
+                        AssistChip(
+                            onClick = { showAddPaymentDialog = true },
+                            label = { Text("Update Payment", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.AddCard, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFFE65100)) }
+                        )
+                    }
+                }
+            }
+
             // Tab bar
             TabRow(
                 selectedTabIndex = selectedTab,
@@ -171,6 +305,7 @@ fun ClientProfileScreen(
                         tasks = tasks,
                         payments = payments,
                         onAddTask = { showAddTaskDialog = true },
+                        onEditTask = { taskToEdit = it; showEditTaskDialog = true },
                         onToggleTask = { viewModel.toggleTaskStatus(it) },
                         onDeleteTask = { viewModel.deleteTask(it) },
                         onAddPayment = { showAddPaymentDialog = true },
@@ -232,6 +367,60 @@ fun ClientProfileScreen(
                 Toast.makeText(context, "Invoice Generated", Toast.LENGTH_SHORT).show()
             }
         )
+    }
+
+    if (showEditClientDialog) {
+        ClientAddEditDialog(
+            client = client,
+            onDismiss = { showEditClientDialog = false },
+            onSave = { updatedClient ->
+                viewModel.saveClient(updatedClient)
+                showEditClientDialog = false
+                Toast.makeText(context, "Client details updated", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete Client Portfolio?") },
+            text = { Text("Are you sure you want to permanently delete client '${client.name}' and all associated services, bills, payments, and tasks? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteClient(client)
+                        showDeleteConfirmation = false
+                        Toast.makeText(context, "Client Deleted", Toast.LENGTH_SHORT).show()
+                        onBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showEditTaskDialog) {
+        taskToEdit?.let { task ->
+            EditTaskDialog(
+                task = task,
+                clientsList = emptyList(),
+                onDismiss = { showEditTaskDialog = false; taskToEdit = null },
+                onSave = { updatedTask ->
+                    viewModel.saveTask(updatedTask)
+                    showEditTaskDialog = false
+                    taskToEdit = null
+                    Toast.makeText(context, "Task Updated", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
     }
 }
 
@@ -659,6 +848,7 @@ fun TabTasksAndPayments(
     tasks: List<Task>,
     payments: List<Payment>,
     onAddTask: () -> Unit,
+    onEditTask: (Task) -> Unit,
     onToggleTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
     onAddPayment: () -> Unit,
@@ -725,8 +915,13 @@ fun TabTasksAndPayments(
                                 Text("Due: ${task.dueDate}  |  Priority: ${task.priority}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                             }
                         }
-                        IconButton(onClick = { onDeleteTask(task) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { onEditTask(task) }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(onClick = { onDeleteTask(task) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
                 }
@@ -1252,6 +1447,129 @@ fun GenerateBillDialog(
                 }
             ) {
                 Text("Generate")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun EditTaskDialog(
+    task: Task,
+    clientsList: List<Client> = emptyList(),
+    onDismiss: () -> Unit,
+    onSave: (Task) -> Unit
+) {
+    val context = LocalContext.current
+    val simpleDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    var title by remember { mutableStateOf(task.title) }
+    var dueDate by remember { mutableStateOf(task.dueDate) }
+    var priority by remember { mutableStateOf(task.priority) }
+    var status by remember { mutableStateOf(task.status) }
+    var notes by remember { mutableStateOf(task.notes) }
+    var selectedClientId by remember { mutableStateOf(task.clientId) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Task Details") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Task Description / Action *") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                OutlinedTextField(
+                    value = dueDate,
+                    onValueChange = { dueDate = it },
+                    label = { Text("Target Due Date (YYYY-MM-DD)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            val cal = Calendar.getInstance()
+                            try {
+                                val parsed = simpleDateFormat.parse(dueDate)
+                                if (parsed != null) cal.time = parsed
+                            } catch (_: Exception) {}
+                            DatePickerDialog(
+                                context,
+                                { _, year, month, dayOfMonth ->
+                                    val sel = Calendar.getInstance().apply {
+                                        set(Calendar.YEAR, year)
+                                        set(Calendar.MONTH, month)
+                                        set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                                    }
+                                    dueDate = simpleDateFormat.format(sel.time)
+                                },
+                                cal.get(Calendar.YEAR),
+                                cal.get(Calendar.MONTH),
+                                cal.get(Calendar.DAY_OF_MONTH)
+                            ).show()
+                        }) {
+                            Icon(Icons.Default.CalendarToday, contentDescription = null)
+                        }
+                    }
+                )
+
+                Text("Priority Level:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Low", "Medium", "High").forEach { pr ->
+                        ElevatedFilterChip(
+                            selected = priority.lowercase() == pr.lowercase(),
+                            onClick = { priority = pr },
+                            label = { Text(pr) }
+                        )
+                    }
+                }
+
+                Text("Task Status:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Pending", "Done").forEach { st ->
+                        ElevatedFilterChip(
+                            selected = status.lowercase() == st.lowercase(),
+                            onClick = { status = st },
+                            label = { Text(st) }
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Specific Action Details") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isBlank()) {
+                        Toast.makeText(context, "Task action is required", Toast.LENGTH_LONG).show()
+                        return@Button
+                    }
+                    val updated = task.copy(
+                        clientId = selectedClientId,
+                        title = title.trim(),
+                        dueDate = dueDate,
+                        priority = priority,
+                        status = status,
+                        notes = notes.trim()
+                    )
+                    onSave(updated)
+                }
+            ) {
+                Text("Save Changes")
             }
         },
         dismissButton = {

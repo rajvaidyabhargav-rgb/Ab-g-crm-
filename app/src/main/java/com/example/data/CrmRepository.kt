@@ -108,6 +108,61 @@ class CrmRepository(private val crmDao: CrmDao) {
         }
     }
 
+    private suspend fun sendFullClientTelegramNotification(client: Client, actionHeader: String) {
+        val services = crmDao.getClientServices(client.id)
+        val servicesStr = if (services.isEmpty()) {
+            "None"
+        } else {
+            services.joinToString("\n") { "• ${it.serviceName}: ${it.quantity} x ₹${it.rate} (Disc: ₹${it.discount}) = ₹${it.total}" }
+        }
+        val paymentStatus = when {
+            client.totalAmount == 0.0 -> "N/A"
+            client.advancePaid >= client.totalAmount -> "Paid"
+            client.advancePaid > 0.0 -> "Partially Paid"
+            else -> "Unpaid"
+        }
+        val message = """
+            <b>$actionHeader - Client Portfolio</b>
+            <b>Client Name:</b> ${client.name}
+            <b>Business Name:</b> ${client.businessName}
+            <b>Phone:</b> ${client.phone}
+            <b>WhatsApp:</b> ${client.whatsapp}
+            <b>Email:</b> ${client.email.ifBlank { "N/A" }}
+            <b>Address:</b> ${client.address.ifBlank { "N/A" }}
+            <b>Package Name:</b> ${client.packageName.ifBlank { "N/A" }}
+            <b>Duration:</b> ${client.durationDays} Days
+            <b>Start Date:</b> ${client.startDate.ifBlank { "N/A" }}
+            <b>End Date:</b> ${client.endDate.ifBlank { "N/A" }}
+            
+            <b>Services with Rates:</b>
+            $servicesStr
+            
+            <b>Total Amount:</b> ₹${client.totalAmount}
+            <b>Advance Paid:</b> ₹${client.advancePaid}
+            <b>Pending Amount:</b> ₹${client.pendingAmount}
+            <b>Payment Status:</b> $paymentStatus
+            <b>Notes:</b> ${client.notes.ifBlank { "N/A" }}
+            <b>Status:</b> ${client.status}
+        """.trimIndent()
+        triggerTelegramNotification(message)
+    }
+
+    private suspend fun sendTaskTelegramNotification(actionLabel: String, task: Task) {
+        val client = crmDao.getClientById(task.clientId)
+        val message = """
+            <b>Task Alert - AB Graphics ($actionLabel)</b>
+            <b>Task:</b> ${task.title}
+            <b>Client:</b> ${client?.name ?: "N/A"}
+            <b>Business:</b> ${client?.businessName ?: "N/A"}
+            <b>Mobile:</b> ${client?.phone ?: "N/A"}
+            <b>Due Date:</b> ${task.dueDate}
+            <b>Priority:</b> ${task.priority}
+            <b>Status:</b> ${task.status}
+            <b>Notes:</b> ${task.notes.ifBlank { "N/A" }}
+        """.trimIndent()
+        triggerTelegramNotification(message)
+    }
+
     // --- Clients ---
     suspend fun insertClient(client: Client) {
         val calculatedPending = client.totalAmount - client.advancePaid
@@ -116,26 +171,8 @@ class CrmRepository(private val crmDao: CrmDao) {
         
         logActivity("Client Added", "Added client ${finalClient.name} for business ${finalClient.businessName}.", generatedId)
 
-        // Telegram alert with ALL fields
-        val message = """
-            <b>🟢 NEW CLIENT ADDED</b>
-            <b>Name:</b> ${finalClient.name}
-            <b>Business Name:</b> ${finalClient.businessName}
-            <b>Phone:</b> ${finalClient.phone}
-            <b>WhatsApp:</b> ${finalClient.whatsapp}
-            <b>Email:</b> ${finalClient.email}
-            <b>Address:</b> ${finalClient.address.ifBlank { "N/A" }}
-            <b>Status:</b> ${finalClient.status}
-            <b>Package Name:</b> ${finalClient.packageName}
-            <b>Duration:</b> ${finalClient.durationDays} Days
-            <b>Start Date:</b> ${finalClient.startDate}
-            <b>End Date:</b> ${finalClient.endDate}
-            <b>Total Billing:</b> ₹${finalClient.totalAmount}
-            <b>Advance Paid:</b> ₹${finalClient.advancePaid}
-            <b>Pending Amount:</b> ₹$calculatedPending
-            <b>Notes:</b> ${finalClient.notes.ifBlank { "N/A" }}
-        """.trimIndent()
-        triggerTelegramNotification(message)
+        val updatedWithId = finalClient.copy(id = generatedId)
+        sendFullClientTelegramNotification(updatedWithId, "🟢 Client Created")
 
         // Supabase Sync
         val settings = crmDao.getSettings() ?: return
@@ -172,37 +209,7 @@ class CrmRepository(private val crmDao: CrmDao) {
 
         logActivity("Client Edited", "Updated client details for ${finalClient.name}.", finalClient.id)
 
-        // Telegram alert showing changed values
-        val message = buildString {
-            appendLine("<b>🟡 CLIENT UPDATED</b>")
-            appendLine("<b>Name:</b> ${finalClient.name}")
-            appendLine("<b>Business:</b> ${finalClient.businessName}")
-            appendLine("")
-            appendLine("<b>CHANGES:</b>")
-            if (oldClient != null) {
-                var changed = false
-                if (oldClient.name != finalClient.name) { appendLine("• Name: ${oldClient.name} ➡️ ${finalClient.name}"); changed = true }
-                if (oldClient.businessName != finalClient.businessName) { appendLine("• Business: ${oldClient.businessName} ➡️ ${finalClient.businessName}"); changed = true }
-                if (oldClient.phone != finalClient.phone) { appendLine("• Phone: ${oldClient.phone} ➡️ ${finalClient.phone}"); changed = true }
-                if (oldClient.whatsapp != finalClient.whatsapp) { appendLine("• WhatsApp: ${oldClient.whatsapp} ➡️ ${finalClient.whatsapp}"); changed = true }
-                if (oldClient.email != finalClient.email) { appendLine("• Email: ${oldClient.email} ➡️ ${finalClient.email}"); changed = true }
-                if (oldClient.address != finalClient.address) { appendLine("• Address: ${oldClient.address.ifBlank { "N/A" }} ➡️ ${finalClient.address.ifBlank { "N/A" }}"); changed = true }
-                if (oldClient.status != finalClient.status) { appendLine("• Status: ${oldClient.status} ➡️ ${finalClient.status}"); changed = true }
-                if (oldClient.packageName != finalClient.packageName) { appendLine("• Package: ${oldClient.packageName} ➡️ ${finalClient.packageName}"); changed = true }
-                if (oldClient.durationDays != finalClient.durationDays) { appendLine("• Duration: ${oldClient.durationDays} Days ➡️ ${finalClient.durationDays} Days"); changed = true }
-                if (oldClient.startDate != finalClient.startDate) { appendLine("• Start Date: ${oldClient.startDate} ➡️ ${finalClient.startDate}"); changed = true }
-                if (oldClient.endDate != finalClient.endDate) { appendLine("• End Date: ${oldClient.endDate} ➡️ ${finalClient.endDate}"); changed = true }
-                if (oldClient.totalAmount != finalClient.totalAmount) { appendLine("• Total Billing: ₹${oldClient.totalAmount} ➡️ ₹${finalClient.totalAmount}"); changed = true }
-                if (oldClient.advancePaid != finalClient.advancePaid) { appendLine("• Advance Paid: ₹${oldClient.advancePaid} ➡️ ₹${finalClient.advancePaid}"); changed = true }
-                if (oldClient.pendingAmount != finalClient.pendingAmount) { appendLine("• Pending: ₹${oldClient.pendingAmount} ➡️ ₹${finalClient.pendingAmount}"); changed = true }
-                if (!changed) {
-                    appendLine("• No specific field values were changed (saved without modifications).")
-                }
-            } else {
-                appendLine("• Previous values not available in local cache.")
-            }
-        }
-        triggerTelegramNotification(message)
+        sendFullClientTelegramNotification(finalClient, "🟡 Client Updated")
 
         // Check if package or expiry date changed, indicating a package renewal
         if (oldClient != null && (oldClient.endDate != finalClient.endDate || oldClient.packageName != finalClient.packageName)) {
@@ -373,15 +380,8 @@ class CrmRepository(private val crmDao: CrmDao) {
         val client = crmDao.getClientById(task.clientId)
         logActivity("Task Added", "Added task '${task.title}' for client ${client?.name ?: "Unknown"}.", task.clientId)
 
-        val message = """
-            <b>📋 TASK ADDED</b>
-            <b>Title:</b> ${task.title}
-            <b>Due Date:</b> ${task.dueDate}
-            <b>Priority:</b> ${task.priority}
-            <b>Client Name:</b> ${client?.name ?: "Unknown"}
-            <b>Notes:</b> ${task.notes.ifBlank { "N/A" }}
-        """.trimIndent()
-        triggerTelegramNotification(message)
+        val updatedTask = task.copy(id = generatedId)
+        sendTaskTelegramNotification("Added", updatedTask)
 
         val settings = crmDao.getSettings() ?: return
         runWithSync {
@@ -404,23 +404,8 @@ class CrmRepository(private val crmDao: CrmDao) {
         val client = crmDao.getClientById(task.clientId)
         logActivity("Task Updated", "Updated task '${task.title}' status to ${task.status}.", task.clientId)
 
-        val message = if (task.status.lowercase() == "completed" && oldTask?.status?.lowercase() != "completed") {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            """
-                <b>✅ TASK COMPLETED</b>
-                <b>Title:</b> ${task.title}
-                <b>Completed Date:</b> ${sdf.format(java.util.Date())}
-                <b>Client Name:</b> ${client?.name ?: "Unknown"}
-            """.trimIndent()
-        } else {
-            """
-                <b>🔔 TASK UPDATE</b>
-                <b>Task:</b> ${task.title}
-                <b>Client:</b> ${client?.name ?: "Unknown"}
-                <b>Status:</b> ${task.status}
-            """.trimIndent()
-        }
-        triggerTelegramNotification(message)
+        val actionLabel = if (task.status.lowercase() == "done" && oldTask?.status?.lowercase() != "done") "Completed" else "Updated"
+        sendTaskTelegramNotification(actionLabel, task)
 
         val settings = crmDao.getSettings() ?: return
         runWithSync {
@@ -440,7 +425,7 @@ class CrmRepository(private val crmDao: CrmDao) {
         crmDao.deleteTask(task)
         logActivity("Task Deleted", "Deleted task '${task.title}'.", task.clientId)
 
-        triggerTelegramNotification("<b>🗑️ TASK DELETED</b>\n<b>Task:</b> ${task.title}")
+        sendTaskTelegramNotification("Deleted", task)
 
         val settings = crmDao.getSettings() ?: return
         runWithSync {
@@ -713,23 +698,7 @@ class CrmRepository(private val crmDao: CrmDao) {
     // --- Trigger Manual Telegram Push ---
     suspend fun pushClientTelegram(clientId: Int): Boolean {
         val client = crmDao.getClientById(clientId) ?: return false
-        val message = """
-            <b>📢 TELEGRAM PUSH: CLIENT PROFILE</b>
-            <b>Name:</b> ${client.name}
-            <b>Business Name:</b> ${client.businessName}
-            <b>Status:</b> ${client.status}
-            <b>Phone:</b> ${client.phone}
-            <b>Email:</b> ${client.email}
-            <b>Address:</b> ${client.address}
-            <b>Package Name:</b> ${client.packageName}
-            <b>Total Billing:</b> ₹${client.totalAmount}
-            <b>Advance Received:</b> ₹${client.advancePaid}
-            <b>Pending Balance:</b> ₹${client.pendingAmount}
-            <b>Start Date:</b> ${client.startDate}
-            <b>End Date:</b> ${client.endDate}
-            <b>Notes:</b> ${client.notes}
-        """.trimIndent()
-        triggerTelegramNotification(message)
+        sendFullClientTelegramNotification(client, "📢 Manual Telegram Push")
         logActivity("Telegram Profile Pushed", "Manually pushed client ${client.name}'s profile alert to Telegram chat.", clientId)
         return true
     }
