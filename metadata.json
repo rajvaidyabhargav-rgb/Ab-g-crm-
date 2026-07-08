@@ -1,0 +1,6 @@
+{
+  "name": "AB Graphics CRM",
+  "description": "Supabase-powered CRM application for AB Graphics with Dashboard, Clients, Packages, Tasks, Bills, Payments, Expenses, and Telegram Integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
