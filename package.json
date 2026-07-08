@@ -4,11 +4,12 @@
   "description": "AB Graphics CRM Android Application Documentation & Landing Page",
   "main": "index.html",
   "scripts": {
-    "build": "echo 'Building production landing page... Success!'",
-    "test": "echo 'All tests passed.'"
+    "build": "vite build"
   },
   "dependencies": {},
-  "devDependencies": {},
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
   "engines": {
     "node": ">=18.0.0"
   }

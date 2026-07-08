@@ -1,6 +1,6 @@
 [build]
-  publish = "."
-  command = "echo 'Android project deployment to Netlify: Serving landing page'"
+  command = "npm run build"
+  publish = "dist"
 
 [[redirects]]
   from = "/*"
